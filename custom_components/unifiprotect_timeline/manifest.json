@@ -1,0 +1,13 @@
+{
+  "domain": "unifiprotect_timeline",
+  "name": "UniFi Protect Timeline",
+  "codeowners": ["@davidfarkas93"],
+  "config_flow": true,
+  "dependencies": ["unifiprotect"],
+  "documentation": "https://github.com/davidfarkas93/ha-unifi-protect-timeline",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/davidfarkas93/ha-unifi-protect-timeline/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

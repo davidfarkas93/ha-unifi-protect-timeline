@@ -1,0 +1,23 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "UniFi Protect Timeline is already configured."
+    },
+    "step": {
+      "user": {
+        "description": "Create timeline sensors for cameras from every loaded UniFi Protect integration."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "history_hours": "History window (hours)",
+          "max_events": "Maximum events per camera",
+          "scan_interval": "Refresh interval (seconds)"
+        }
+      }
+    }
+  }
+}

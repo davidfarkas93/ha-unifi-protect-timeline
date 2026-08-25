@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches manifest
+        run: |
+          VERSION=$(python -c 'import json; print(json.load(open("custom_components/unifiprotect_timeline/manifest.json"))["version"])')
+          test "v$VERSION" = "${GITHUB_REF_NAME}"
+      - name: Build HACS archive
+        run: |
+          cd custom_components/unifiprotect_timeline
+          zip -r ../../unifiprotect_timeline.zip .
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: unifiprotect_timeline.zip
+          generate_release_notes: true
+

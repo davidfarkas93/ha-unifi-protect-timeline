@@ -1,0 +1,23 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "A UniFi Protect Timeline már be van állítva."
+    },
+    "step": {
+      "user": {
+        "description": "Idővonal-szenzorok létrehozása minden betöltött UniFi Protect integráció kameráihoz."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "history_hours": "Előzményablak (óra)",
+          "max_events": "Események maximális száma kameránként",
+          "scan_interval": "Frissítési időköz (másodperc)"
+        }
+      }
+    }
+  }
+}

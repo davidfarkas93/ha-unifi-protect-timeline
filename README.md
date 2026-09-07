@@ -14,6 +14,7 @@ card, but does not depend on Luma.
 - Fetches each NVR timeline once per refresh instead of once per camera.
 - Exposes authenticated Home Assistant proxy URLs for thumbnails and videos.
 - Normalizes motion and smart-detection event types.
+- Filters non-media audit events such as Protect administrator activity.
 - Deduplicates and sorts events newest-first.
 - Marks entities unavailable when Protect requests fail.
 - Configurable history window, per-camera event limit, and refresh interval.
@@ -86,4 +87,3 @@ pytest
 ## License
 
 MIT
-

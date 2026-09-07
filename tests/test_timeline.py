@@ -38,6 +38,12 @@ def test_normalize_events_filters_sorts_and_deduplicates() -> None:
         },
         {"id": "new", "camera": "cam-1", "start": 1_710_000_000_000, "end": 1},
         {"id": "other", "camera": "cam-2", "start": 1_720_000_000_000, "end": 1},
+        {
+            "id": "admin",
+            "camera": "cam-1",
+            "start": 1_730_000_000_000,
+            "type": "adminActivity",
+        },
         {"id": "invalid", "camera": "cam-1", "start": "bad", "end": 1},
     ]
 

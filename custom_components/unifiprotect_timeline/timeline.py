@@ -6,6 +6,11 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
 
+# Protect includes configuration and audit records in the same event feed as
+# camera footage. These records may carry a camera ID, but they do not have a
+# playable recording or thumbnail and must not be exposed as timeline events.
+NON_MEDIA_EVENT_TYPES = frozenset({"adminActivity"})
+
 
 def normalize_event_type(event: dict[str, Any]) -> str:
     """Return a stable, human-readable event type."""
@@ -32,6 +37,9 @@ def normalize_events(
     rows: list[tuple[str, datetime, str]] = []
 
     for event in events:
+        if event.get("type") in NON_MEDIA_EVENT_TYPES:
+            continue
+
         event_id = event.get("id") or event.get("event_id")
         event_camera_id = event.get("camera") or event.get("camera_id")
         start_ms = event.get("start")
@@ -65,4 +73,3 @@ def normalize_events(
             break
 
     return result
-

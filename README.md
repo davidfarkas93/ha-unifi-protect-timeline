@@ -12,9 +12,12 @@ card, but does not depend on Luma.
 
 - Discovers cameras from every loaded core UniFi Protect integration.
 - Fetches each NVR timeline once per refresh instead of once per camera.
+- Loads the configured history window only at startup, then requests new events
+  incrementally with a small overlap for reliable deduplication.
 - Exposes authenticated Home Assistant proxy URLs for thumbnails and videos.
 - Normalizes motion and smart-detection event types.
-- Filters non-media audit events such as Protect administrator activity.
+- Requests only playable camera event types and defensively filters connection,
+  configuration, and audit records that have no thumbnail or recording.
 - Deduplicates and sorts events newest-first.
 - Marks entities unavailable when Protect requests fail.
 - Configurable history window, per-camera event limit, and refresh interval.

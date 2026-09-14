@@ -6,10 +6,20 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
 
-# Protect includes configuration and audit records in the same event feed as
-# camera footage. These records may carry a camera ID, but they do not have a
-# playable recording or thumbnail and must not be exposed as timeline events.
-NON_MEDIA_EVENT_TYPES = frozenset({"adminActivity"})
+# Protect includes connection, configuration, and audit records in the same
+# event feed as camera footage. Some carry a camera ID, but do not have a
+# playable recording or thumbnail. Keep this allowlist as a defensive layer in
+# case the upstream API ignores the coordinator's requested event types.
+MEDIA_EVENT_TYPES = frozenset(
+    {
+        "motion",
+        "ring",
+        "smartDetectZone",
+        "smartDetectLine",
+        "smartDetectLoiterZone",
+        "smartAudioDetect",
+    }
+)
 
 
 def normalize_event_type(event: dict[str, Any]) -> str:
@@ -37,8 +47,10 @@ def normalize_events(
     rows: list[tuple[str, datetime, str]] = []
 
     for event in events:
-        if event.get("type") in NON_MEDIA_EVENT_TYPES:
+        raw_event_type = str(event.get("type") or "motion")
+        if raw_event_type not in MEDIA_EVENT_TYPES:
             continue
+        event_type = normalize_event_type(event)
 
         event_id = event.get("id") or event.get("event_id")
         event_camera_id = event.get("camera") or event.get("camera_id")
@@ -51,7 +63,7 @@ def normalize_events(
         except (TypeError, ValueError, OSError):
             continue
 
-        rows.append((str(event_id), started, normalize_event_type(event)))
+        rows.append((str(event_id), started, event_type))
 
     rows.sort(key=lambda row: row[1], reverse=True)
     seen: set[str] = set()
@@ -73,3 +85,35 @@ def normalize_events(
             break
 
     return result
+
+
+def merge_normalized_events(
+    existing: Iterable[dict[str, str]],
+    incoming: Iterable[dict[str, str]],
+    *,
+    cutoff: datetime,
+    max_events: int,
+) -> list[dict[str, str]]:
+    """Merge incremental results, prune the history window, and deduplicate."""
+    rows: list[tuple[datetime, dict[str, str]]] = []
+    seen: set[str] = set()
+
+    # Incoming rows win if an overlapping event was updated by Protect.
+    for event in [*incoming, *existing]:
+        event_id = event.get("id")
+        timestamp = event.get("timestamp")
+        if not event_id or not timestamp or event_id in seen:
+            continue
+        try:
+            started = datetime.fromisoformat(timestamp)
+        except ValueError:
+            continue
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        if started < cutoff:
+            continue
+        seen.add(event_id)
+        rows.append((started, event))
+
+    rows.sort(key=lambda row: row[0], reverse=True)
+    return [event for _, event in rows[:max_events]]

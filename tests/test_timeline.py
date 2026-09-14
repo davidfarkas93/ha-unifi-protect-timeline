@@ -44,6 +44,18 @@ def test_normalize_events_filters_sorts_and_deduplicates() -> None:
             "start": 1_730_000_000_000,
             "type": "adminActivity",
         },
+        {
+            "id": "connected",
+            "camera": "cam-1",
+            "start": 1_740_000_000_000,
+            "type": "cameraConnected",
+        },
+        {
+            "id": "disconnected",
+            "camera": "cam-1",
+            "start": 1_750_000_000_000,
+            "type": "disconnect",
+        },
         {"id": "invalid", "camera": "cam-1", "start": "bad", "end": 1},
     ]
 
@@ -88,3 +100,50 @@ def test_smart_detection_without_types_falls_back() -> None:
         timeline.normalize_event_type({"type": "smartDetectZone"})
         == "smartDetectZone"
     )
+
+
+def test_all_supported_media_event_types_are_kept() -> None:
+    """Every requested Protect media event type remains representable."""
+    events = [
+        {
+            "id": event_type,
+            "camera": "cam",
+            "start": (index + 1) * 1000,
+            "type": event_type,
+        }
+        for index, event_type in enumerate(sorted(timeline.MEDIA_EVENT_TYPES))
+    ]
+
+    result = timeline.normalize_events(
+        events,
+        camera_id="cam",
+        nvr_id="nvr",
+        max_events=20,
+        video_url_factory=_video,
+        thumbnail_url_factory=_thumbnail,
+    )
+
+    assert {event["type"] for event in result} == timeline.MEDIA_EVENT_TYPES
+
+
+def test_incremental_results_are_merged_pruned_and_deduplicated() -> None:
+    """Incoming updates replace cached rows without losing recent history."""
+    existing = [
+        {"id": "old", "timestamp": "2024-01-01T00:00:00+00:00", "type": "motion"},
+        {"id": "same", "timestamp": "2024-01-03T00:00:00+00:00", "type": "motion"},
+        {"id": "kept", "timestamp": "2024-01-02T00:00:00+00:00", "type": "motion"},
+    ]
+    incoming = [
+        {"id": "new", "timestamp": "2024-01-04T00:00:00+00:00", "type": "person"},
+        {"id": "same", "timestamp": "2024-01-03T00:00:00+00:00", "type": "person"},
+    ]
+
+    result = timeline.merge_normalized_events(
+        existing,
+        incoming,
+        cutoff=datetime(2024, 1, 2, tzinfo=UTC),
+        max_events=3,
+    )
+
+    assert [event["id"] for event in result] == ["new", "same", "kept"]
+    assert result[1]["type"] == "person"

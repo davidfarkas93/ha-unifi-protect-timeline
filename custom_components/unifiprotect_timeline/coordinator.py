@@ -13,12 +13,26 @@ from homeassistant.components.unifiprotect.views import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from uiprotect.data import EventType
 
 from .const import DOMAIN
-from .timeline import normalize_events
+from .timeline import merge_normalized_events, normalize_events
 
 _LOGGER = logging.getLogger(__name__)
 CoordinatorData = dict[str, list[dict[str, str]]]
+
+# Ask Protect only for camera events that can have playable media. Passing
+# ``types=None`` makes uiprotect work around a Protect API bug by iterating over
+# every matching event, including audit, connection, and configuration records.
+MEDIA_EVENT_TYPES = [
+    EventType.MOTION,
+    EventType.RING,
+    EventType.SMART_DETECT,
+    EventType.SMART_DETECT_LINE,
+    EventType.SMART_DETECT_LOITER,
+    EventType.SMART_AUDIO_DETECT,
+]
+QUERY_OVERLAP = timedelta(seconds=10)
 
 
 class ProtectTimelineCoordinator(DataUpdateCoordinator[CoordinatorData]):
@@ -48,32 +62,46 @@ class ProtectTimelineCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.camera_ids = camera_ids
         self.history_hours = history_hours
         self.max_events = max_events
+        self._last_query_end: datetime | None = None
 
     async def _async_update_data(self) -> CoordinatorData:
         now = datetime.now(UTC)
+        history_start = now - timedelta(hours=self.history_hours)
+        query_start = history_start
+        if self._last_query_end is not None:
+            query_start = max(history_start, self._last_query_end - QUERY_OVERLAP)
+
         try:
             raw_events = await self.api.get_events_raw(
-                start=now - timedelta(hours=self.history_hours),
+                start=query_start,
                 end=now,
-                types=None,
+                types=MEDIA_EVENT_TYPES,
                 limit=max(100, self.max_events * len(self.camera_ids)),
-                sorting="sorting",
+                sorting="desc",
             )
         except Exception as err:
             raise UpdateFailed(f"Unable to fetch UniFi Protect events: {err}") from err
 
-        return {
-            camera_id: normalize_events(
-                raw_events,
-                camera_id=camera_id,
-                nvr_id=self.nvr_id,
-                max_events=self.max_events,
-                video_url_factory=async_generate_proxy_event_video_url,
-                thumbnail_url_factory=lambda event_id, nvr_id: (
-                    async_generate_thumbnail_url(
-                        event_id, nvr_id, width=480, height=270
-                    )
+        previous_data = self.data or {}
+        updated_data = {
+            camera_id: merge_normalized_events(
+                previous_data.get(camera_id, []),
+                normalize_events(
+                    raw_events,
+                    camera_id=camera_id,
+                    nvr_id=self.nvr_id,
+                    max_events=self.max_events,
+                    video_url_factory=async_generate_proxy_event_video_url,
+                    thumbnail_url_factory=lambda event_id, nvr_id: (
+                        async_generate_thumbnail_url(
+                            event_id, nvr_id, width=480, height=270
+                        )
+                    ),
                 ),
+                cutoff=history_start,
+                max_events=self.max_events,
             )
             for camera_id in self.camera_ids
         }
+        self._last_query_end = now
+        return updated_data
